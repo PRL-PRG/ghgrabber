@@ -83,8 +83,8 @@ function make_submodule_museum {
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/submodules.awk" | \
     while read commit file
     do
-        echo commit: $commit
-        echo file: $file
+        #echo commit: $commit
+        #echo file: $file
         if [ "$file" == 0000000000000000000000000000000000000000 ]
         then
             echo "" > "$1/$commit"
