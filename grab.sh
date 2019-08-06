@@ -1,5 +1,123 @@
 #!/bin/bash
 
+function usage {
+    echo "Usage: grab.sh [OPTION]... [REPO]..."
+    echo "Download specified GitHub repositories and extract specific information.       "
+    echo 
+    echo "Mandatory arguments to long options are mandatory for short options too.       "
+    echo "  -s, --simple-output             turns off prefix-based directory structure   "
+    echo "                                  in the output dir                            "
+    echo "  -m, --modules=MODULES           specify a comma-separated list of modules to "
+    echo "                                  run, each module extract different type of   "
+    echo "                                  data:                                        "
+    echo "                                    commit_metadata                            "
+    echo "                                    commit_file_modification_info              "
+    echo "                                    commit_file_modification_hashes            "
+    echo "                                    commit_comments                            "
+    echo "                                    commit_parents                             "
+    echo "                                    commit_repositories                        "
+    echo "                                    repository_info                            "
+    echo "                                    submodule_history                          "
+    echo "                                    submodule_museum                           "
+    echo "  -f, --repo-list=REPO_LIST       list of repositories to download, one        "
+    echo "                                  repository per line in the form:             "
+    echo "                                    USER/PROJECT                               "
+    echo "  -p, --processes:                number of parallel processes to use          "
+    echo "  -o, --output-dir:               output directory for extracted data          "
+    echo "                                                                               "
+    echo "Repo list can either be provided by -f or by specyfing the repos as arguments. "
+    echo "If both are provided, repos specified via file take precedence.                "
+    echo "                                                                               " 
+    echo "Requires GNU parallel.                                                         "
+}
+
+# Parse options
+options=$(getopt -u \
+    -o sm:f:p:o:h \
+    --long simple-output-dirs,modules:,repo-list:,processes:,output-dir:,help \
+    -n $0 -- "$@")
+
+if [ $? != 0 ] 
+then 
+    echo "Argh! Parsing went pear-shaped!" >&2
+    exit 1 
+fi
+
+# Defaults
+export SIMPLE_OUTPUT=false
+export GHGRABBER_HOME="$(pwd)"
+export OUTPUT_DIR="${GHGRABBER_HOME}/data"
+export PROCESSES=1
+declare -A MODULES
+export MODULES
+MODULES[commit_metadata]=1
+MODULES[commit_file_modification_info]=1
+MODULES[commit_file_modification_hashes]=1
+MODULES[commit_comments]=1
+MODULES[commit_parents]=1
+MODULES[commit_repositories]=1
+MODULES[repository_info]=1
+MODULES[submodule_history]=1
+MODULES[submodule_museum]=1
+
+
+# Analyze results of parsing options
+set -- $options 
+while true  
+do
+    echo $1
+    case "$1" in 
+        -s|--simple-output) 
+            SIMPLE_OUTPUT=true 
+            shift 1;;
+        -m|--modules)
+            unset MODULES
+            declare -A MODULES
+            export MODULES
+            IFS="," read -r -a modules <<< "$2"
+            for module in "${modules[@]}"
+            do
+                MODULES["$module"]=1
+            done
+            shift 2;; 
+        -f|--repo-list) 
+            REPOS_LIST="$2"
+            if [ ! -f "$REPOS_LIST" ]
+            then
+                echo "'$REPOS_LIST' is not a file." >&2
+                exit 4
+            fi
+            shift 2;; 
+        -p|--processes) 
+            processes="$2"
+            shift 2;; 
+        -o|--output-dir) 
+            OUTPUT_DIR="$2"
+            if expr "$OUTPUT_DIR" : "^/" >/dev/null 
+            then 
+                :
+            else 
+                OUTPUT_DIR="$GHGRABBER_HOME/$OUTPUT_DIR"
+            fi
+            shift 2;; 
+        -h|--help) 
+            usage
+            exit 2;; 
+        --) 
+            shift
+            break;; 
+        *) 
+            echo "Ack! She cannae take it anymore, captain!" >&2
+            exit 3;;
+    esac 
+done
+
+echo SIMPLE_OUTPUT=$SIMPLE_OUTPUT
+echo OUTPUT_DIR=$OUTPUT_DIR
+echo MODULES=${MODULES[@]}
+echo REPOS_LIST=$REPOS_LIST
+echo PROCESSES=$PROCESSES
+
 # Timing helper functions
 function timing_init   {
     if [ -e "$1" ]
@@ -132,19 +250,13 @@ function sequence_next_value {
 
 # Toplevel functions that set up the scraper.
 function prepare_globals {
-    export REPOS_LIST=`use_first_if_available "$1" "repos.list"`
-    export OUTPUT_DIR=`use_first_if_available "$2" "data"`
-    export GHGRABBER_HOME="$(pwd)"
+    #export REPOS_LIST=`use_first_if_available "$1" "repos.list"`
+    #export OUTPUT_DIR=`use_first_if_available "$2" "data"`
+    #export GHGRABBER_HOME="$(pwd)"
     
-    PROCESSES=`use_first_if_available "$3" 1`
+    #PROCESSES=`use_first_if_available "$3" 1`
     ECHO_PREFIX=main
 
-    if expr "$OUTPUT_DIR" : "^/" >/dev/null 
-    then 
-        :
-    else 
-        OUTPUT_DIR="$GHGRABBER_HOME/$OUTPUT_DIR"
-    fi
 
     export SEQUENCE="$OUTPUT_DIR/sequence.val"
     sequence_new "$SEQUENCE" 0
@@ -360,7 +472,6 @@ export -f timing_output
 export -f escape_quotes
 export -f err_echo
 export -f use_first_if_available
-export -f prepare_globals
 export -f prepare_directories
 export -f download_repo_contents
 export -f retrieve_commit_metadata
@@ -379,8 +490,17 @@ export -f sequence_new
 export -f sequence_current_value
 export -f sequence_next_value
 
+# Check dependencies
+if which parallel
+then
+    :
+else
+    err_echo [[ GNU parallel missing. Cannot continue. ]]
+    exit 5
+fi
+
 # Main.
-prepare_globals "$@"
+#prepare_globals "$@"
 prepare_directories
 timing_init "$OUTPUT_DIR/timing.csv"
 
