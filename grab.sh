@@ -3,6 +3,8 @@
 source functions.sh
 source scraper.sh
 
+ECHO_PREFIX=`basename $0`
+
 function usage {
     echo "Usage: grab.sh [OPTION]..."
     echo "Download specified GitHub repositories and extract specific information.       "
@@ -28,50 +30,45 @@ function usage {
     echo "  -p, --processes:                number of parallel processes to use          "
     echo "  -o, --output-dir:               output directory for extracted data          "
     echo "                                                                               "
-    echo "Requires GNU parallel.                                                         "
+    echo "Requires GNU Parallel.                                                         "
 }
+
+# If no options, print usage and exit
+if [ $# -eq 0 ]
+then
+    usage
+    exit 6
+fi
 
 # Parse options
 options=$(getopt -u \
     -o sm:f:p:o:h \
-    --long simple-output-dirs,modules:,repo-list:,processes:,output-dir:,help \
+    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,help \
     -n $0 -- "$@")
 
 if [ $? != 0 ] 
 then 
-    echo "Argh! Parsing went pear-shaped!" >&2
+    err_echo "Argh! Parsing went pear-shaped!"
     exit 1 
 fi
 
 # Defaults
-export SIMPLE_OUTPUT=false
+export USE_SORTING_DIR=true
 export GHGRABBER_HOME="$(pwd)"
 export OUTPUT_DIR="${GHGRABBER_HOME}/data"
 export PROCESSES=1
-declare -A MODULES
-export MODULES
-MODULES[commit_metadata]=1
-MODULES[commit_file_modification_info]=1
-MODULES[commit_file_modification_hashes]=1
-MODULES[commit_comments]=1
-MODULES[commit_parents]=1
-MODULES[commit_repositories]=1
-MODULES[repository_info]=1
-MODULES[submodule_history]=1
-MODULES[submodule_museum]=1
+export MODULE_LIST="commit_metadata,commit_file_modification_info,commit_file_modification_hashes,commit_comments,commit_parents,commit_repositories,repository_info,submodule_history,submodule_museum"
 
 # Analyze results of parsing options
 set -- $options 
 while true  
 do
     case "$1" in 
-        -s|--simple-output) 
-            SIMPLE_OUTPUT=true 
+        -s|--no-sorting-dir) 
+            USE_SORTING_DIR=false
             shift 1;;
         -m|--modules)
-            unset MODULES
-            declare -A MODULES
-            export MODULES
+            MODULE_LIST="$2"
             IFS="," read -r -a modules <<< "$2"
             for module in "${modules[@]}"
             do
@@ -82,12 +79,12 @@ do
             REPOS_LIST="$2"
             if [ ! -f "$REPOS_LIST" ]
             then
-                echo "'$REPOS_LIST' is not a file." >&2
+                err_echo "'$REPOS_LIST' is not a file."
                 exit 4
             fi
             shift 2;; 
         -p|--processes) 
-            processes="$2"
+            PROCESSES="$2"
             shift 2;; 
         -o|--output-dir) 
             OUTPUT_DIR="$2"
@@ -105,12 +102,19 @@ do
             shift
             break;; 
         *) 
-            echo "Ack! She cannae take it anymore, captain!" >&2
+            err_echo "Ack! She cannae take it anymore, captain!" 
             exit 3;;
     esac 
 done
 
-ECHO_PREFIX=main
+if [ -z "$REPOS_LIST" ]
+then
+    err_echo "Cannot continue, provide a list of repositories to download."
+    err_echo "Run the $0 with no arguments for usage information."
+    exit 7
+fi
+
+
 export SEQUENCE="$OUTPUT_DIR/sequence.val"
 sequence_new "$SEQUENCE" 0
 
@@ -128,6 +132,8 @@ write_specification_certificate
 
 err_echo [[ downloading repos from "'$REPOS_LIST'" to "'$OUTPUT_DIR'" using $PROCESSES processes ]]
 err_echo [[ `< "$REPOS_LIST" wc -l` total repositories to download ]]
+
+err_echo [[ extracting the following $(echo MODULE_LIST | tr , ' ' | wc -w) modules: "$MODULE_LIST" ]]
 
 err_echo [[ started downloading on `date` ]]
 <"$REPOS_LIST" parallel -v -k --ungroup -j $PROCESSES download_and_analyze_repository 

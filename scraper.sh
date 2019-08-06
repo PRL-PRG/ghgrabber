@@ -102,45 +102,116 @@ export -f make_submodule_museum
 
 function prepare_directories {
     sorting_dir="$1"
-    repo="$2"
+    repo_encoding="$2"
 
-    mkdir -p "$OUTPUT_DIR/commit_metadata/$sorting_dir"
-    #mkdir -p "$OUTPUT_DIR/commit_files/$sorting_dir"
-    mkdir -p "$OUTPUT_DIR/commit_file_hashes/$sorting_dir"
-    mkdir -p "$OUTPUT_DIR/commit_comments/$sorting_dir"
-    mkdir -p "$OUTPUT_DIR/commit_parents/$sorting_dir"
-    #mkdir -p "$OUTPUT_DIR/commit_repositories/$sorting_dir"
-    #mkdir -p "$OUTPUT_DIR/repository_info/$sorting_dir"
-    #mkdir -p "$OUTPUT_DIR/submodule_history/$sorting_dir"
-    mkdir -p "$OUTPUT_DIR/submodule_museum/$1/$2"
+    [ ${MODULES[commit_metadata]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_metadata/" "$sorting_dir")"
+
+    [ ${MODULES[commit_file_modification_info]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_files/" "$sorting_dir")"
+
+    [ ${MODULES[commit_file_modification_hashes]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_file_hashes/" "$sorting_dir")"
+
+    [ ${MODULES[commit_comments]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_comments/" "$sorting_dir")"
+
+    [ ${MODULES[commit_parents]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_parents/" "$sorting_dir")"
+
+    [ ${MODULES[commit_repositories]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/commit_repositories/" "$sorting_dir")"
+
+    [ ${MODULES[repository_info]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/repository_info/" "$sorting_dir")"
+
+    [ ${MODULES[submodule_history]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/submodule_history/" "$sorting_dir")"
+
+    [ ${MODULES[submodule_museum]+isset} ] && \
+        mkdir -p "$(make_path "$OUTPUT_DIR/submodule_museum/" "$sorting_dir" "$repo_encoding")"
 }
 export -f prepare_directories
 
+function make_path {
+    local directory="$1"
+    local sorting_dir="$2"
+    shift 2
+    local tail=$(IFS='/'; echo "$*")
+
+    if $USE_SORTING_DIR
+    then
+        echo "${directory}/${sorting_dir}/${tail}"
+    else
+        echo "${directory}/${tail}"
+    fi
+}
+export -f make_path
+
 function retrieve_data {
-    sorting_dir="$1"
-    filename="$2"
-    user="$2"
-    project="$3"
+    local sorting_dir="$1"
+    local filename="$2"
+    local user="$2"
+    local project="$3"
+
+    [ ${MODULES[commit_metadata]+isset} ] && \
+        retrieve_commit_metadata > \
+        "$(make_path "$OUTPUT_DIR/commit_metadata" "$sorting_dir" "$filename")"
+
+    [ ${MODULES[commit_file_modification_info]+isset} ] && \
+        retrieve_commit_file_modification_info > \
+        "$(make_path "$OUTPUT_DIR/commit_files" "$sorting_dir" "$filename")"
+
+    [ ${MODULES[commit_file_modification_hashes]+isset} ] && \
+        retrieve_commit_file_modification_hashes > \
+        "$(make_path "$OUTPUT_DIR/commit_file_hashes" "$sorting_dir" "$filename")"
     
+    [ ${MODULES[commit_comments]+isset} ] && \
+        retrieve_commit_comments > \
+        "$(make_path "$OUTPUT_DIR/commit_comments" "$sorting_dir" "$filename")"
 
-    retrieve_commit_metadata                 > "$OUTPUT_DIR/commit_metadata/$sorting_dir/${filename}"
-    #retrieve_commit_file_modification_info   > "$OUTPUT_DIR/commit_files/$sorting_dir/${filename}"
-    retrieve_commit_file_modification_hashes > "$OUTPUT_DIR/commit_file_hashes/$sorting_dir/${filename}"
-    retrieve_commit_comments                 > "$OUTPUT_DIR/commit_comments/$sorting_dir/${filename}"
-    retrieve_commit_parents                  > "$OUTPUT_DIR/commit_parents/$sorting_dir/${filename}"
-    #retrieve_commit_repositories $i          > "$OUTPUT_DIR/commit_repositories/$sorting_dir/${filename}"
-    #retrieve_repository_info $user $repo $i  > "$OUTPUT_DIR/repository_info/$sorting_dir/${filename}"
-    #retrieve_submodule_history               > "$OUTPUT_DIR/submodule_history/$sorting_dir/${filename}"
+    [ ${MODULES[commit_parents]+isset} ] && \
+        retrieve_commit_parents > \
+        "$(make_path "$OUTPUT_DIR/commit_parents" "$sorting_dir" "$filename")"
 
-    make_submodule_museum "$OUTPUT_DIR/submodule_museum/$sorting_dir/${user}_${project}/"
+    [ ${MODULES[commit_repositories]+isset} ] && \
+        retrieve_commit_repositories $i > \
+        "$(make_path "$OUTPUT_DIR/commit_repositories" "$sorting_dir" "$filename")"
+
+    [ ${MODULES[repository_info]+isset} ] && \
+        retrieve_repository_info $user $repo $i > \
+        "$(make_path "$OUTPUT_DIR/repository_info" "$sorting_dir" "$filename")"
+
+    [ ${MODULES[submodule_history]+isset} ] && \
+        retrieve_submodule_history > \
+        "$(make_path "$OUTPUT_DIR/submodule_history" "$sorting_dir" "$filename")"
+
+    [ ${MODULES[submodule_museum]+isset} ] && \
+        make_submodule_museum \
+        "$(make_path "$OUTPUT_DIR/submodule_museum" "$sorting_dir" "${user}_${project}")"
 }
 export -f retrieve_data
 
 function retrieve_repository_stats {
     local filename="${1}_${2}.csv"
     local sorting_dir="$(expr substr ${1} 1 3)"
-    local number_of_files=$(< "$OUTPUT_DIR/commit_file_hashes/$sorting_dir/${filename}" wc -l 2>/dev/null || )
-    local number_of_commits=$(< "$OUTPUT_DIR/commit_metadata/$sorting_dir/${filename}" wc -l 2>/dev/null )
+    if [ -d "$OUTPUT_DIR/commit_file_hashes/" ]
+    then 
+        local number_of_files=$( \
+            < "$(make_path "$OUTPUT_DIR/commit_file_hashes" "$sorting_dir" "$filename")" \
+            wc -l 2>/dev/null )
+    else
+        local number_of_files=?
+    fi
+
+    if [ -d "$OUTPUT_DIR/commit_metadata/" ]
+    then
+        local number_of_commits=$( \
+            < "$(make_path "$OUTPUT_DIR/commit_metadata" "$sorting_dir" "$filename")" \
+            wc -l 2>/dev/null )
+    else
+        local number_of_commits=?
+    fi
     local repository_size=$(du -s . | cut -f 1)
     echo -n "${number_of_files},${number_of_commits},${repository_size}"
 }
@@ -166,18 +237,21 @@ function process_repository {
     prepare_directories "${sorting_dir}" "${user}_${project}"
     retrieve_data "${sorting_dir}" "${filename}" "${user}" "${project}"
 
-#     retrieve_commit_metadata                 > "$OUTPUT_DIR/commit_metadata/$sorting_dir/${filename}"
-#     #retrieve_commit_file_modification_info   > "$OUTPUT_DIR/commit_files/$sorting_dir/${filename}"
-#     retrieve_commit_file_modification_hashes > "$OUTPUT_DIR/commit_file_hashes/$sorting_dir/${filename}"
-#     retrieve_commit_comments                 > "$OUTPUT_DIR/commit_comments/$sorting_dir/${filename}"
-#     retrieve_commit_parents                  > "$OUTPUT_DIR/commit_parents/$sorting_dir/${filename}"
-#     #retrieve_commit_repositories $i          > "$OUTPUT_DIR/commit_repositories/$sorting_dir/${filename}"
-#     #retrieve_repository_info $user $repo $i  > "$OUTPUT_DIR/repository_info/$sorting_dir/${filename}"
-#     #retrieve_submodule_history               > "$OUTPUT_DIR/submodule_history/$sorting_dir/${filename}"
-#     make_submodule_museum "$OUTPUT_DIR/submodule_museum/$sorting_dir/${user}_${project}/"
+    if [ -d "$OUTPUT_DIR/commit_file_hashes" ]
+    then
+        
+        number_of_files=$(< "$(make_path "$OUTPUT_DIR/commit_file_hashes" "$sorting_dir" "$filename")" wc -l)
+    else
+        number_of_files=?
+    fi
 
-    number_of_files=$(< "$OUTPUT_DIR/commit_file_hashes/$sorting_dir/${filename}" wc -l)
-    number_of_commits=$(< "$OUTPUT_DIR/commit_metadata/$sorting_dir/${filename}" wc -l)
+    if [ -d "$OUTPUT_DIR/commit_metadata" ]
+    then
+        number_of_commits=$(< "$(make_path "$OUTPUT_DIR/commit_metadata" "$sorting_dir" "$filename")" wc -l)
+    else
+        number_of_commits=?
+    fi
+
     repository_size=$(du -s . | cut -f 1)
 
     cd "$GHGRABBER_HOME"
@@ -194,18 +268,14 @@ function process_repository {
 }
 export -f process_repository
 
-function retrieve_repository_stats {
-    local filename="${1}_${2}.csv"
-    local sorting_dir="$(expr substr ${1} 1 3)"
-    local number_of_files=$(< "$OUTPUT_DIR/commit_file_hashes/$sorting_dir/${filename}" wc -l 2>/dev/null || )
-    local number_of_commits=$(< "$OUTPUT_DIR/commit_metadata/$sorting_dir/${filename}" wc -l 2>/dev/null )
-    local repository_size=$(du -s . | cut -f 1)
-    echo -n "${number_of_files},${number_of_commits},${repository_size}"
-}
-export -f retrieve_repository_stats
-
 # Pre-process arguments and start processing a single repository.
 function download_and_analyze_repository {
+
+    declare -A MODULES
+    for module in `echo $MODULE_LIST | tr , ' '`
+    do
+        MODULES["$module"]=1
+    done
 
     err_echo [[ starting new task ]]
 
