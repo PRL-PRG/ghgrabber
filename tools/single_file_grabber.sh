@@ -33,7 +33,7 @@ while true; do
         shift;;
     --output-dir|-o) 
         destination_dir="$2"
-        [ -f "$destination_dir" ] || { 
+        [ -d "$destination_dir" ] || { 
             echo -e "[\e[36m$0\e[0m] Destination directory does not exist or is not a directory: $destination_dir" >&2 
             problem=true
         }
