@@ -1,3 +1,4 @@
+#!/bin/bash
 # Install before using: csvtool, wget
 
 repository_ids_file=
@@ -85,6 +86,8 @@ view_file="${home}/view"
 repos_file="${home}/repos"
 log_file="${home}/log"
 
+echo -e "[\e[36m$0\e[0m] finding projects with specified IDs in \e[31m${projects_file}\e[0m" >&2
+
 # XXX Probably could do this better with csvtool.
 cat "$repository_ids_file" | while read line
 do 
@@ -93,9 +96,11 @@ done > "$pattern_file"
 
 <"$projects_file" grep -f "$pattern_file" >"$view_file"
 
-echo "[\e[36m$0\e[0m]" I found $(< "$view_file" wc -l) projects \\
-  for the $(< "$repository_ids_file" wc -l) project IDs you gave me \\
-  \(see "$view_file" for details\). >&2
+n_found=$(< "$view_file" wc -l)
+n_searched=$(< "$repository_ids_file" wc -l)
+echo "[\e[36m$0\e[0m] I found $n_found projects" \
+  "for the $n_searched project IDs you gave me"  \
+  "(see "$view_file" for details)." >&2
 
 function record_time {
     date '+%s%3N' # miliseconds    
@@ -112,29 +117,43 @@ function timing_print  {
     echo -n ${hours}:${minutes}:${seconds}.${miliseconds}
 }
 
+# runtime variables
+prefix_length=80
+
+function glue {
+    echo "printf ' %.0s' {$1..$prefix_length}" | bash
+}	
+
 echo -e "[\e[36m$0\e[0m] starting downloads" >&2
 all_start_time=`record_time`
 csvtool format '%(2)/%(3)\n' "$view_file" | while read repo
 do
+    prefix="[\e[36m$0\e[0m] [\e[94m${repo}\e[0m] "
+    my_prefix_length=$(expr length "$prefix")
+    if ((my_prefix_length > prefix_length))
+    then
+        prefix_length=$my_prefix_length
+    fi    
+
     start_time=`record_time`
-    echo -e "[\e[36m$0\e[0m] [\e[94m${repo}\e[0m]    \tstarting download" >&2
+    echo -e "[\e[36m$0\e[0m] [\e[94m${repo}\e[0m] $(glue $my_prefix_length)starting download" >&2
 
     for file in "${files[@]}"
     do
         prefix_folder="${repo:0:2}"
         path_dir="${destination_dir}/${prefix_folder}/${repo}"
         path="${path_dir}/${file}"
-        repo_address="https://github.com/${repo}/master/${file}"
+        repo_address="https://github.com/${repo}/blob/master/${file}"
 
-        echo -ne "[\e[36m$0\e[0m] [\e[94m${repo}\e[0m]    \t  * \e[33m${repo_address}\e[0m -> \e[33m${path}\e[0m" >&2
+	echo -ne "${prefix}$(glue $my_prefix_length)  * \e[33m${repo_address}\e[0m" >&2 #-> \e[33m${path}\e[0m" >&2
 
         mkdir -p "$path_dir"
         wget "$repo_address" -O "$path" 2>>"$log_file"
 
         case $? in
-            0) echo -e "...\e[32mOK\e[0m" >&2;;
-            1) echo -e "...\e[31mFAIL\e[0m" >&2;;
-            2) echo -e "...\e[31mFAIL\e[0m (parse error)" >&2;;
+	    0) echo -e "...\e[32mOK\e[0m" >&2;;
+	    1) echo -e "...\e[31mFAIL\e[0m" >&2;;
+	    2) echo -e "...\e[31mFAIL\e[0m (parse error)";;
             3) echo -e "...\e[31mFAIL\e[0m (file I/O error)" >&2;;
             4) echo -e "...\e[31mFAIL\e[0m (network failure)" >&2;;
             5) echo -e "...\e[31mFAIL\e[0m (SSL verification failure)" >&2;;
@@ -146,10 +165,13 @@ do
     done
 
     elapsed_time=$(timing_print $(($(record_time) - start_time)))
-    echo -e "[\e[36m$0\e[0m] [\e[94m${repo}\e[0m]    \tfinished download in \e[34m${elapsed_time}\e[0m" >&2
+    echo -e "[\e[36m$0\e[0m] [\e[94m${repo}\e[0m] $(glue $my_prefix_length)finished download in \e[34m${elapsed_time}\e[0m" >&2
 done
+
 all_elapsed_time=$(timing_print $(($(record_time) - all_start_time)))
 echo -e "[\e[36m$0\e[0m] finished all in \e[34m${all_elapsed_time}\e[0m" >&2
+#echo -e "[\e[36m$0\e[0m] downloaded files: \e[32m${successes}\e[0m, errors: \e[31m${failures}\e[0m" >&2
+echo -e "[\e[36m$0\e[0m] data downloaded to \e[94m${destination_dir}\e[0m" >&2
 echo -e "[\e[36m$0\e[0m] error details available at \e[31m${log_file}\e[0m" >&2
 
 
