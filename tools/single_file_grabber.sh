@@ -98,7 +98,7 @@ done > "$pattern_file"
 
 n_found=$(< "$view_file" wc -l)
 n_searched=$(< "$repository_ids_file" wc -l)
-echo "[\e[36m$0\e[0m] I found $n_found projects" \
+echo -e "[\e[36m$0\e[0m] I found $n_found projects" \
   "for the $n_searched project IDs you gave me"  \
   "(see "$view_file" for details)." >&2
 
