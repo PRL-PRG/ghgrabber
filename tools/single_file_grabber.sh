@@ -92,7 +92,7 @@ $problem && {
 }
 
 files=( "$@" )
-pattern_file="${home}/patterns"
+#pattern_file="${home}/patterns"
 view_file="${home}/view"
 repos_file="${home}/repos"
 log_file="${home}/log"
@@ -100,12 +100,23 @@ log_file="${home}/log"
 echo -e "[\e[36m$0\e[0m] finding projects with specified IDs in \e[31m${projects_file}\e[0m" >&2
 
 # XXX Probably could do this better with csvtool.
-cat "$repository_ids_file" | while read line
-do 
-    echo '^'${line}','
-done > "$pattern_file"
+#cat "$repository_ids_file" | while read line
+#do 
+#    echo '^'${line}','
+#done > "$pattern_file"
+#
+#<"$projects_file" grep -f "$pattern_file" >"$view_file"
 
-<"$projects_file" grep -f "$pattern_file" >"$view_file"
+awk -v repository_ids="$repository_ids_file" '
+    BEGIN {
+        FS=","; 
+        while((getline id < repository_ids) > 0) {
+            ids[id]=1
+        }
+    } 
+    ($1 in ids) {
+        print
+    }' <"$projects_file" >"$view_file"
 
 n_found=$(< "$view_file" wc -l)
 n_searched=$(< "$repository_ids_file" wc -l)
