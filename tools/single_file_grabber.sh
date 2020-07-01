@@ -5,7 +5,10 @@ repository_ids_file=
 projects_file='/data/dejavu/join/projects.csv'
 destination_dir='/tmp/grabber/'
 
-options=$(getopt -o r:p:o: --long repositories:,projects:,output-dir:,help -- "$@")
+ids_as_file_names=false
+ids_as_dir_names=false
+
+options=$(getopt -o r:p:o: --long repositories:,projects:,output-dir:,ids-as-file-names,ids-as-dir-names,help -- "$@")
 problem=false
 show_usage=false
 
@@ -45,6 +48,9 @@ while true; do
             problem=true
         }
         shift;;
+    --ids-as-file-names) ids_as_file_names=true;;
+    --ids-as-dir-names)  ids_as_dir_names=true;;
+        
     --help) show_usage=true;;
     --)     shift; break;;
     esac
@@ -69,6 +75,11 @@ done
 
 [ -z "$repository_ids_file" ] && {
     echo -e "[\e[36m$0\e[0m] Must specify a list of repositories to download files from." >&2
+    problem=true
+}
+
+ids_as_file_names && (( $# > 1 )) && {
+    echo -e "[\e[36m$0\e[0m] Cannot download multiple files when the option --ids-as-file-names is used." >&2
     problem=true
 }
 
