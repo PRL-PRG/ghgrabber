@@ -30,6 +30,7 @@ function usage {
     echo "                                    USER/PROJECT                               "
     echo "  -p, --processes:                number of parallel processes to use          "
     echo "  -o, --output-dir:               output directory for extracted data          "
+    echo "  --no-renames:                   do not detect renames                        "
     echo "                                                                               "
     echo "Requires GNU Parallel.                                                         "
 }
@@ -44,7 +45,7 @@ fi
 # Parse options
 options=$(getopt -u \
     -o sm:f:p:o:h \
-    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,help \
+    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,no-renames,help \
     -n $0 -- "$@")
 
 if [ $? != 0 ] 
@@ -96,6 +97,9 @@ do
                 OUTPUT_DIR="$GHGRABBER_HOME/$OUTPUT_DIR"
             fi
             shift 2;; 
+        --no-renames) 
+            export RENAMES="--no-renames"    
+            shift;;
         -h|--help) 
             usage
             exit 2;; 

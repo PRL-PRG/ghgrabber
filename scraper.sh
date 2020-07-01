@@ -26,16 +26,16 @@ function retrieve_commit_metadata {
 export -f retrieve_commit_metadata
 
 function retrieve_commit_file_modification_info {
-    err_echo [[ retrieving commit file modification info ]]
-    git log --format="%n%n%H"  --numstat --raw --all -M -C | \
+    err_echo [[ retrieving commit file modification info "($RENAMES)" ]]
+    git log --format="%n%n%H"  --numstat --raw --all -M -C $RENAMES | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/numstat.awk"
 }
 export -f retrieve_commit_file_modification_info
 
 function retrieve_commit_file_modification_hashes {
-    err_echo [[ retrieving commit file modification hashes ]]
-    git log --format="%n%n%H" --raw --no-abbrev --all -M -C -m | \
+    err_echo [[ retrieving commit file modification hashes "($RENAMES)" ]]
+    git log --format="%n%n%H" --raw --no-abbrev --all -M -C -m $RENAMES | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/raw.awk"
 }
