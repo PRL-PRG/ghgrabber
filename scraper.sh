@@ -27,7 +27,8 @@ export -f retrieve_commit_metadata
 
 function retrieve_commit_file_modification_info {
     err_echo [[ retrieving commit file modification info ]]
-    git log --pretty=format:-----%H:::  --numstat --all -M -C | \
+    git log --format="%n%n%H"  --numstat --raw --all -M -C | \
+    tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/numstat.awk"
 }
 export -f retrieve_commit_file_modification_info
