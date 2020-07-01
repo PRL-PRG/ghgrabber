@@ -38,9 +38,6 @@ BEGIN {
     OFS=",";
     ORS="\n";
 
-    # constants to serve as field indices
-    
-
     # output header
     print quote("hash"), quote("added lines"), quote("deleted lines"), quote("filename"), quote("old filename")
 } 
@@ -56,6 +53,9 @@ BEGIN {
     # split into numstat and raw inputs
     for(ix in stats) {
         line = stats[ix];
+        if (line ~ /^[ \t]*$/) {
+            continue;
+        }
         if (line ~ "^[ \t]*:") {
             raw[raw_length++] = line;
         } else {    
@@ -64,7 +64,6 @@ BEGIN {
     }
 
     for (ix = 0; ix < numstat_length; ix++) {
-        #print $1, raw[ix], numstat[ix];
         split(raw[ix], raw_columns, /[\t]+/);
         split(numstat[ix], numstat_columns, /[\t]+/);
 
@@ -85,37 +84,8 @@ BEGIN {
         } else if (length(raw_columns) == 3) {
             print $1, added, deleted, quote_if_needed(raw_columns[3]), quote_if_needed(raw_columns[2]);
         } else {
-            print $1, added, deleted, quote_if_needed(raw_columns[3]), quote_if_needed(raw_columns[2]), "# FORMAT ERROR: " length(raw_columns) " fields in line " raw[ix] " (expected 2 or 3)";
+            print $1, added, deleted, quote_if_needed(raw_columns[3]), quote_if_needed(raw_columns[2]), 
+                  "# FORMAT ERROR: " length(raw_columns) " fields in line " raw[ix] " (expected 2 or 3)";
         }
     }
-
-    # then, for each line re-format its contents
-#     for (i in stats) {
-#         if (stats[i] ~ "^ *$") {
-#             # ignore empty lines
-#         } else {
-#             # split the statline into number of added lines, removed lines, and
-#             # the name of the file
-#             split(stats[i], statline, /[ \t]+/);
-# 
-#             # for each modified file output the hash of the commit, and the
-#             # stat info for the file
-#             #print quote($1) , statline[1], statline[2], quote(escape(statline[3]));
-# 
-#             # this means that we have just one file name, the classic case
-#             if (length(statline) == 3) {
-#                 print $1, statline[1], statline[2], quote_if_needed(statline[3]), "";
-# 
-# 	    # this means we have a rename or copy situation where there is an
-# 	    # old name and then an arrow "=>" and a new name
-#             } else if (length(statline) == 5) {
-#                 print $1, statline[1], statline[2], quote_if_needed(statline[5]), quote_if_needed(statline[3]);
-# 
-#             # this means something is seriously wrong
-#             } else {
-#                 print $1, statline[1], statline[2], quote_if_needed(statline[5]), quote_if_needed(statline[3]), "# FORMAT ERROR: " length(statline) " fields";
-#             }
-# 
-#         }
-#     }
 }
