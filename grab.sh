@@ -28,6 +28,10 @@ function usage {
     echo "                                  download, one repository per line in the     "
     echo "                                  form:                                        "
     echo "                                    USER/PROJECT                               "
+    echo "  --single-repo-path=PATH         directory containing a git repository,       "
+    echo "                                  use with --single-repo                       "
+    echo "  --single-repo=USER/PROJECT      user and project names of a git repository,  "
+    echo "                                  use with --single-repo-path                  "
     echo "  -p, --processes:                number of parallel processes to use          "
     echo "  -o, --output-dir:               output directory for extracted data          "
     echo "  --no-renames:                   do not detect renames                        "
@@ -45,12 +49,12 @@ fi
 # Parse options
 options=$(getopt -u \
     -o sm:f:p:o:h \
-    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,no-renames,help \
+    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,no-renames,single-repo:,single-repo-path:,help \
     -n $0 -- "$@")
 
 if [ $? != 0 ] 
 then 
-    err_echo "Argh! Parsing went pear-shaped!"
+    err_echo "Argh! Argument parsing went pear-shaped!"
     exit 1 
 fi
 
@@ -60,6 +64,10 @@ export GHGRABBER_HOME="$(pwd)"
 export OUTPUT_DIR="${GHGRABBER_HOME}/data"
 export PROCESSES=1
 export MODULE_LIST="commit_metadata,commit_file_modification_info,commit_file_modification_hashes,commit_comments,commit_parents,commit_repositories,repository_info,submodule_history,submodule_museum"
+
+SINGLE_REPO_USER=""
+SINGLE_REPO_PROJECT=""
+SINGLE_REPO_PATH=""
 
 # Analyze results of parsing options
 set -- $options 
@@ -84,6 +92,28 @@ do
                 err_echo "'$REPOS_LIST' is not a file."
                 exit 4
             fi
+            shift 2;;
+        --single-repo)
+            SINGLE_REPO_USER=$(dirname "$2")
+            SINGLE_REPO_PROJECT=$(basename "$2")
+            shift 2;;
+        --single-repo-path) 
+            SINGLE_REPO_PATH="$2"
+            if [ ! -d "$SINGLE_REPO_PATH" ]
+            then
+                err_echo "'$SINGLE_REPO_PATH' is not a directory."
+                exit 15
+            fi
+            tmp_path=`pwd`
+            cd "$SINGLE_REPO_PATH"
+            if git status 1>/dev/null 2>/dev/null
+            then
+                :
+            else
+                err_echo "'$SINGLE_REPO_PATH' is not a git repository."
+                exit 16 
+            fi
+            cd "$tmp_path"
             shift 2;; 
         -p|--processes) 
             PROCESSES="$2"
@@ -112,13 +142,32 @@ do
     esac 
 done
 
-if [ -z "$REPOS_LIST" ]
+if [ -n "$REPOS_LIST" ] && [ -n "$SINGLE_REPO_PATH" ]
 then
-    err_echo "Cannot continue, provide a list of repositories to download."
+    err_echo "Cannot continue, provided both a list of repositories to download and a single repository to analyze."
+    err_echo "Run the $0 with no arguments for usage information."
+    exit 17
+fi
+
+if [ -n "$SINGLE_REPO_PATH" ]
+then
+    if [ -z "$SINGLE_REPO_USER" ] || [ -z "$SINGLE_REPO_PROJECT" ]
+    then
+        err_echo "Cannot continue, provided invalid single repository user or project name: ${SINGLE_REPO_USER}/${SINGLE_REPO_PROJECT}."
+        err_echo "Provide the user and project names via commandline argument --single-repo=USER/PROJECT."
+        err_echo "For example: --single-repo=PRL-PRG/ghgrabber."
+        err_echo "The USER and PROJECT parts must be separated by a slash."
+        err_echo "Run the $0 with no arguments for usage information."
+        exit 18
+    fi
+fi
+
+if [ -z "$REPOS_LIST" ] && [ -z "$SINGLE_REPO_PATH" ]
+then
+    err_echo "Cannot continue, provide a list of repositories to download or a single repository to analyze."
     err_echo "Run the $0 with no arguments for usage information."
     exit 7
 fi
-
 
 export SEQUENCE="$OUTPUT_DIR/sequence.val"
 sequence_new "$SEQUENCE" 0
@@ -132,18 +181,29 @@ else
     exit 5
 fi
 
-timing_init "$OUTPUT_DIR/timing.csv"
-write_specification_certificate
+if [ -n "$SINGLE_REPO_PATH" ]
+then
+    err_echo [[ analyzing predownloaded repo from "'$SINGLE_REPO_PATH'" "(${SINGLE_REPO_USER}/${SINGLE_REPO_PROJECT})" to "'$OUTPUT_DIR'" ]]
 
-err_echo [[ downloading repos from "'$REPOS_LIST'" to "'$OUTPUT_DIR'" using $PROCESSES processes ]]
-err_echo [[ `< "$REPOS_LIST" wc -l` total repositories to download ]]
+    analyze_predownloaded_repository "$SINGLE_REPO_USER" "$SINGLE_REPO_PROJECT" "$SINGLE_REPO_PATH"
+fi
 
-err_echo [[ extracting the following $(echo MODULE_LIST | tr , ' ' | wc -w) modules: "$MODULE_LIST" ]]
+if [ -n "$REPOS_LIST" ]
+then
+    timing_init "$OUTPUT_DIR/timing.csv"
+    write_specification_certificate
 
-err_echo [[ started downloading on `date` ]]
-<"$REPOS_LIST" parallel -v -k --ungroup -j $PROCESSES download_and_analyze_repository 
-err_echo [[ finished downloading on `date` ]]
+    err_echo [[ downloading repos from "'$REPOS_LIST'" to "'$OUTPUT_DIR'" using $PROCESSES processes ]]
+    err_echo [[ `< "$REPOS_LIST" wc -l` total repositories to download ]]
 
-err_echo [[ compress data ]]
-compress_data
-err_echo [[ done compressing data ]]
+    err_echo [[ extracting the following $(echo MODULE_LIST | tr , ' ' | wc -w) modules: "$MODULE_LIST" ]]
+
+    err_echo [[ started downloading on `date` ]]
+    <"$REPOS_LIST" parallel -v -k --ungroup -j $PROCESSES download_and_analyze_repository 
+    err_echo [[ finished downloading on `date` ]]
+
+    err_echo [[ compress data ]]
+    compress_data
+    err_echo [[ done compressing data ]]
+
+fi

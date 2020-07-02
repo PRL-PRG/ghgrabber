@@ -240,7 +240,6 @@ function process_repository {
 
     if [ -d "$OUTPUT_DIR/commit_file_hashes" ]
     then
-        
         number_of_files=$(< "$(make_path "$OUTPUT_DIR/commit_file_hashes" "$sorting_dir" "$filename")" wc -l)
     else
         number_of_files=?
@@ -268,6 +267,42 @@ function process_repository {
     return 0
 }
 export -f process_repository
+
+# process a single repository that already lives in the filesystem,
+# a simplification of the function above
+function process_predownloaded_repository {
+    local user="$1"
+    local project="$2"
+    local repository_path="$3"
+    local sorting_dir="$(expr substr $user 1 3)"
+    local filename="${user}_${project}.csv"
+
+    echo user $user
+    echo project $project
+    echo path $repository_path
+    echo sprting dir $sorting_dir
+    echo filename $filename
+
+    cd "${repository_path}"
+    prepare_directories "${sorting_dir}" "${user}_${project}"
+    retrieve_data "${sorting_dir}" "${filename}" "${user}" "${project}"
+
+    if [ -d "$OUTPUT_DIR/commit_file_hashes" ]
+    then
+        number_of_files=$(< "$(make_path "$OUTPUT_DIR/commit_file_hashes" "$sorting_dir" "$filename")" wc -l)
+    else
+        number_of_files=?
+    fi
+
+    if [ -d "$OUTPUT_DIR/commit_metadata" ]
+    then
+        number_of_commits=$(< "$(make_path "$OUTPUT_DIR/commit_metadata" "$sorting_dir" "$filename")" wc -l)
+    else
+        number_of_commits=?
+    fi
+
+    return 0
+}
 
 # Pre-process arguments and start processing a single repository.
 function download_and_analyze_repository {
@@ -314,7 +349,31 @@ function download_and_analyze_repository {
         "$status" \
         "$number_of_files" "$number_of_commits" "$repository_size" 
 
-    err_echo [[ done with status $? ]]
+    err_echo [[ done with status $status ]]
     return 0
 }
 export -f download_and_analyze_repository
+
+# pre-process arguments and start processing a single repository,
+# that was already downloaded and lives on the filesystem,
+# this is a simplification of the function above
+function analyze_predownloaded_repository {
+    local user="$1"
+    local project="$2"
+    local repository_path="$3"
+
+    declare -A MODULES
+    for module in `echo $MODULE_LIST | tr , ' '`
+    do
+        MODULES["$module"]=1
+    done
+
+    err_echo [[ starting new task ]]
+    err_echo [[ processing "$user/$project" at "$repository_path" ]]
+
+    process_predownloaded_repository "$user" "$project" "$repository_path"
+
+    local status=$?
+    err_echo [[ done with status $status ]]  
+    return 0
+}
