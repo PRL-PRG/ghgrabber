@@ -35,6 +35,8 @@ function usage {
     echo "  -p, --processes:                number of parallel processes to use          "
     echo "  -o, --output-dir:               output directory for extracted data          "
     echo "  --no-renames:                   do not detect renames                        "
+    echo "  --only-master:                  analyze only the master branch of each git   "
+    echo "                                  repository instead of all branches           "
     echo "                                                                               "
     echo "Requires GNU Parallel.                                                         "
 }
@@ -49,7 +51,7 @@ fi
 # Parse options
 options=$(getopt -u \
     -o sm:f:p:o:h \
-    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,no-renames,single-repo:,single-repo-path:,help \
+    --long no-sorting-dir,modules:,repo-list:,processes:,output-dir:,no-renames,single-repo:,single-repo-path:,only-master,help \
     -n $0 -- "$@")
 
 if [ $? != 0 ] 
@@ -68,6 +70,9 @@ export MODULE_LIST="commit_metadata,commit_file_modification_info,commit_file_mo
 SINGLE_REPO_USER=""
 SINGLE_REPO_PROJECT=""
 SINGLE_REPO_PATH=""
+
+export RENAMES=""
+export BRANCHES="--all"
 
 # Analyze results of parsing options
 set -- $options 
@@ -129,6 +134,9 @@ do
             shift 2;; 
         --no-renames) 
             export RENAMES="--no-renames"    
+            shift;;
+        --only-master) 
+            export BRANCHES=""    
             shift;;
         -h|--help) 
             usage

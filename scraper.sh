@@ -17,48 +17,83 @@ function download_repo_contents {
 }
 export -f download_repo_contents
 
+function printable_options {
+    local string=""
+
+    if echo "$@" | fgrep -q "branches"
+    then
+        if [ -n "$BRANCHES" ]
+        then
+            string="${string}all branches"
+        else
+            string="${string}master branch"
+        fi
+    fi
+
+    if echo "$@" | fgrep -q "renames"
+    then
+        if [ -n "${string}" ]
+        then
+            string="${string}, "
+        fi
+
+        if [ -z "$RENAMES" ]
+        then
+            string="${string}follow renames"
+        else
+            string="${string}do not follow renames"
+        fi
+    fi
+
+    if [ -n "${string}" ]
+    then
+        echo -n "(${string})"
+    fi
+}
+export -f printable_options
+
 # Functions for retrieving specific bits of information form one repository.
 function retrieve_commit_metadata {
-    err_echo [[ retrieving commit metadata ]]
-    git log --pretty=format:'%H%n%ae%n%at%n%ce%n%ct%n%D%n🐹%n%n' --all | \
+    err_echo [[ retrieving commit metadata `printable_options branches` ]]
+    git log --pretty=format:'%H%n%ae%n%at%n%ce%n%ct%n%D%n🐹%n%n' $BRANCHES | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/metadata.awk"
 }
 export -f retrieve_commit_metadata
 
 function retrieve_commit_file_modification_info {
-    err_echo [[ retrieving commit file modification info "($RENAMES)" ]]
-    git log --format="%n%n%H"  --numstat --raw --all -M -C $RENAMES | \
+    err_echo [[ retrieving commit file modification info `printable_options branches renames` ]]
+    git log --format="%n%n%H"  --numstat --raw $BRANCHES -M -C $RENAMES | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/numstat.awk"
 }
 export -f retrieve_commit_file_modification_info
 
 function retrieve_commit_file_modification_hashes {
-    err_echo [[ retrieving commit file modification hashes "($RENAMES)" ]]
-    git log --format="%n%n%H" --raw --no-abbrev --all -M -C -m $RENAMES | \
+    err_echo [[ retrieving commit file modification hashes `printable_options branches renames` ]]
+    git log --format="%n%n%H" --raw --no-abbrev $BRANCHES -M -C -m $RENAMES | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/raw.awk"
 }
 export -f retrieve_commit_file_modification_hashes
 
 function retrieve_commit_comments {
-    err_echo [[ retrieving commit messages ]]
-    git log --pretty=format:"🐹 %H%n%B"  --all | \
+    err_echo [[ retrieving commit messages `printable_options branches` ]]
+    git log --pretty=format:"🐹 %H%n%B"  $BRANCHES | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/comment.awk"
 }
 export -f retrieve_commit_comments
 
 function retrieve_commit_parents {
-    err_echo [[ retrieving commit parents ]]
-    git log --pretty=format:"%H %P" --all | \
+    err_echo [[ retrieving commit parents `printable_options branches` ]]
+    git log --pretty=format:"%H %P" $BRANCHES | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/parents.awk"
 }
 export -f retrieve_commit_parents
 
 function retrieve_commit_repositories {
-    err_echo [[ retrieving commit repositories ]]
+    err_echo [[ retrieving commit repositories `printable_options branches` ]]
     echo '"hash","id"'
-    git log --pretty=format:"\"%H\",$1" --all
+    git log --pretty=format:"\"%H\",$1" $BRANCHES
 }
 export -f retrieve_commit_repositories
 
@@ -70,16 +105,16 @@ function retrieve_repository_info {
 export -f retrieve_repository_info
 
 function retrieve_submodule_history {
-    err_echo [[ retrieving submodule history ]]
-    git log --format="%n%n%H" --full-history --no-abbrev --raw --all -M -C -m -- .gitmodules | \
+    err_echo [[ retrieving submodule history `printable_options branches` ]]
+    git log --format="%n%n%H" --full-history --no-abbrev --raw $BRANCHES -M -C -m -- .gitmodules | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -v OFS=, -v header=1 -f "${GHGRABBER_HOME}/awk/submodules.awk" 
 }
 export -f retrieve_submodule_history
 
 function make_submodule_museum {
-    err_echo [[ creating submodule museum ]]
-    git log --format="%n%n%H" --full-history --no-abbrev --raw --all -M -C -m -- .gitmodules | \
+    err_echo [[ creating submodule museum `printable_options branches` ]]
+    git log --format="%n%n%H" --full-history --no-abbrev --raw $BRANCHES -M -C -m -- .gitmodules | \
     tail -n +3 | \
     AWKPATH="${GHGRABBER_HOME}/awk" awk -f "${GHGRABBER_HOME}/awk/submodules.awk" | \
     while read commit file
@@ -277,12 +312,6 @@ function process_predownloaded_repository {
     local sorting_dir="$(expr substr $user 1 3)"
     local filename="${user}_${project}.csv"
 
-    echo user $user
-    echo project $project
-    echo path $repository_path
-    echo sprting dir $sorting_dir
-    echo filename $filename
-
     cd "${repository_path}"
     prepare_directories "${sorting_dir}" "${user}_${project}"
     retrieve_data "${sorting_dir}" "${filename}" "${user}" "${project}"
@@ -303,6 +332,7 @@ function process_predownloaded_repository {
 
     return 0
 }
+export -f process_predownloaded_repository 
 
 # Pre-process arguments and start processing a single repository.
 function download_and_analyze_repository {
@@ -377,3 +407,4 @@ function analyze_predownloaded_repository {
     err_echo [[ done with status $status ]]  
     return 0
 }
+export -f analyze_predownloaded_repository
