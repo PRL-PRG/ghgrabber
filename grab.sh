@@ -10,7 +10,7 @@ function usage {
     echo "Download specified GitHub repositories and extract specific information.       "
     echo 
     echo "Mandatory arguments to long options are mandatory for short options too.       "
-    echo "  -s, --simple-output             turns off prefix-based directory structure   "
+    echo "  -s, --no-sorting-dir            turns off prefix-based directory structure   "
     echo "                                  in the output dir                            "
     echo "  -m, --modules=MODULES           specify a comma-separated list of modules to "
     echo "                                  run, each module extract different type of   "
